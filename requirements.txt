@@ -1,0 +1,14 @@
+# Core inference stack
+streamlit>=1.35.0
+torch>=2.1.0
+transformers>=4.40.0
+peft>=0.10.0
+bitsandbytes>=0.43.0
+accelerate>=0.29.0
+sentencepiece>=0.2.0
+huggingface_hub>=0.22.0
+
+# Optional: Unsloth for faster loading of Gemma-4 adapters
+# Install separately on Linux GPU machines:
+#   pip install unsloth unsloth_zoo
+
