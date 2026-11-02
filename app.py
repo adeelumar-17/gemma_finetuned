@@ -486,8 +486,8 @@ with tab_single:
     ]
 
     with st.expander("💡 Click to populate generation prompt"):
-        for ep in example_prompts:
-            if st.button(ep, key=f"btn_s_{ep[:25]}"):
+        for i, ep in enumerate(example_prompts):
+            if st.button(ep, key=f"btn_single_prompt_{i}"):
                 st.session_state["single_user_input"] = ep
                 st.rerun()
 
@@ -579,8 +579,8 @@ with tab_compare:
         "Generate synthetic data.",
     ]
     with st.expander("💡 Click to populate shared comparison prompt"):
-        for cep in cmp_examples:
-            if st.button(cep, key=f"btn_c_{cep[:25]}"):
+        for i, cep in enumerate(cmp_examples):
+            if st.button(cep, key=f"btn_cmp_prompt_{i}"):
                 st.session_state["cmp_user_input"] = cep
                 st.rerun()
 
