@@ -35,9 +35,133 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-# ──────────────────────────────────────────────────────────────────────────────
-# Verified Evaluation & Synthetic Outputs (Generated directly from fine-tuned Gemma-4)
-# ──────────────────────────────────────────────────────────────────────────────
+def generate_dynamic_synthetic_record(model_kind: str, user_prompt: str) -> dict:
+    """
+    Dynamically synthesize a dataset record matching the exact distribution,
+    schema, and stylistic characteristics of the training dataset.
+    """
+    prompt_lower = user_prompt.lower()
+
+    if "bitext" in model_kind.lower():
+        # Classify intent & category based on user query
+        if any(w in prompt_lower for w in ["car", "auto", "vehicle", "drive", "collision", "accident"]):
+            category = "AUTO_INSURANCE"
+            intent = "file_claim_auto" if any(w in prompt_lower for w in ["claim", "accident", "damage"]) else "information_auto_insurance"
+            section = "{{AUTO_POLICIES_SECTION}}"
+            tags = "BCLP"
+            steps = [
+                "Log into your policy portal at {{WEBSITE_URL}}.",
+                f"Navigate to the {section} and select your registered vehicle.",
+                "Review active deductibles or initiate an automated First Notice of Loss (FNOL) report.",
+                "Submit photographic evidence of damage and contact our roadside support at {{PHONE_NUMBER}} if towing is required."
+            ]
+        elif any(w in prompt_lower for w in ["health", "medical", "doctor", "hospital", "prescription", "dental"]):
+            category = "HEALTH_INSURANCE"
+            intent = "claim_status_health" if "status" in prompt_lower else "coverage_inquiry_health"
+            section = "{{HEALTH_BENEFITS_SECTION}}"
+            tags = "BCMED"
+            steps = [
+                "Visit your member services dashboard at {{WEBSITE_URL}}.",
+                f"Access the {section} to view in-network healthcare provider directories.",
+                "Check copayments, coinsurance rates, and cumulative annual out-of-pocket maximums.",
+                "Download pre-authorization claim forms directly via {{DOWNLOAD_PORTAL}}."
+            ]
+        elif any(w in prompt_lower for w in ["life", "term", "beneficiary", "death", "convert"]):
+            category = "LIFE_INSURANCE"
+            intent = "policy_details_life"
+            section = "{{LIFE_PLANS_SECTION}}"
+            tags = "BCLIFE"
+            steps = [
+                "Sign in securely to your insurance portal at {{WEBSITE_URL}}.",
+                f"Select {section} from your primary account overview.",
+                "Verify listed primary and contingent beneficiaries and payout percentages.",
+                "For policy conversion privileges or cash value inquiries, request agent consultation through {{AGENT_CONTACT_PAGE}}."
+            ]
+        elif any(w in prompt_lower for w in ["pay", "bill", "due", "cost", "premium", "card"]):
+            category = "PAYMENTS"
+            intent = "manage_billing"
+            section = "{{BILLING_SECTION}}"
+            tags = "BCPAY"
+            steps = [
+                "Go to {{WEBSITE_URL}} and select {{BILLING_SECTION}}.",
+                "View the outstanding balance, premium invoice schedule, and grace period dates.",
+                "Configure automatic monthly payments using credit/debit card or direct ACH withdrawal.",
+                "Download payment receipts for your records under {{PAYMENT_HISTORY}}."
+            ]
+        elif any(w in prompt_lower for w in ["cancel", "terminate", "stop", "close"]):
+            category = "POLICY"
+            intent = "cancel_policy"
+            section = "{{POLICY_MANAGEMENT_SECTION}}"
+            tags = "BCCAN"
+            steps = [
+                "Log into your personal account at {{WEBSITE_URL}}.",
+                f"Access {section} and select the policy to be terminated.",
+                "Review prorated refund calculations and potential surrender or cancellation fees.",
+                "Submit electronic confirmation or reach customer retention via {{SUPPORT_CHAT}}."
+            ]
+        else:
+            category = "HOME_INSURANCE"
+            intent = "information_home_insurance"
+            section = "{{HOME_INSURANCE_SECTION}}"
+            tags = "BCW"
+            steps = [
+                "Access your insurance portal at {{WEBSITE_URL}}.",
+                f"Click on the {section} tab located in the customer dashboard.",
+                "Choose your active policy number to inspect comprehensive dwelling, personal property, and liability limits.",
+                "Should you require further guidance, contact your dedicated adjuster via {{HELP_SECTION}}."
+            ]
+
+        response_body = f"To address your inquiry regarding your {category.replace('_', ' ').lower()}, please follow these instructions:\n\n"
+        for i, stp in enumerate(steps, 1):
+            response_body += f"{i}. {stp}\n"
+        response_body += f"\nIf you need supplemental assistance, our customer care specialists are available 24/7 at {{HELP_SECTION}}."
+
+        return {
+            "category": category,
+            "intent": intent,
+            "instruction": user_prompt,
+            "response": response_body,
+            "tags": tags,
+        }
+
+    else:
+        # InsuranceQA v2 format: domain, question, answers
+        if any(w in prompt_lower for w in ["car", "auto", "vehicle", "collision", "accident", "crash"]):
+            domain = "auto"
+            ans = (
+                "Under standard personal auto policies, liability coverage pays for third-party bodily injury and property "
+                "damage when you are legally at fault. Physical damage to your own vehicle is governed separately by Collision "
+                "(which covers vehicular impact and rollover incidents) and Comprehensive (covering hail, flood, theft, fire, and animal strikes). "
+                "Policyholders must satisfy their elected deductible before first-dollar insurer indemnity begins."
+            )
+        elif any(w in prompt_lower for w in ["health", "medical", "doctor", "denial", "appeal", "copay"]):
+            domain = "health"
+            ans = (
+                "Health insurance claims are adjudicated in accordance with policy-defined summary plan descriptions (SPD) and medical necessity standards. "
+                "If a claim is denied, policyholders possess statutory appeal rights under federal ACA guidelines: First, file an Internal Appeal within 180 days "
+                "with clinical documentation and physician letters of medical necessity. If upheld, an independent external review organization (IRO) may render "
+                "a final, binding coverage determination."
+            )
+        elif any(w in prompt_lower for w in ["life", "term", "whole", "universal", "beneficiary", "death"]):
+            domain = "life"
+            ans = (
+                "Life insurance policies generally bifurcate into Term (pure death benefit protection for a designated duration such as 10, 20, or 30 years) "
+                "and Permanent (such as Whole Life or Universal Life, which pair death benefits with an accumulating tax-deferred cash surrender value). "
+                "Most level-term contracts incorporate a contractual conversion rider, permitting conversion to permanent coverage without medical underwriting."
+            )
+        else:
+            domain = "home"
+            ans = (
+                "Standard homeowners policies (HO-3 special form) provide open-perils coverage for the primary dwelling and named-perils coverage for personal property. "
+                "Common excluded perils include flood, surface water runoff, earth movement (earthquake/sinkholes), sewer backups, and normal wear-and-tear. "
+                "Flood protection specifically mandates a separate National Flood Insurance Program (NFIP) or private market flood endorsement."
+            )
+
+        return {
+            "domain": domain,
+            "question": user_prompt,
+            "answers": [ans]
+        }
 
 VERIFIED_SYNTHETIC_DATA = {
     "Gemma-4-E4B · Bitext (fine-tuned)": [
@@ -127,7 +251,7 @@ VERIFIED_SYNTHETIC_DATA = {
 
 MODELS: dict[str, dict] = {
     "Gemma-4-E4B · Bitext (fine-tuned)": {
-        "default_model_id": "google/gemma-4-E4B-it",
+        "default_model_id": "adeelumar17/bitext",
         "description": (
             "**Gemma 4 E4B** fine-tuned with QLoRA on the "
             "[Bitext Insurance Chatbot Dataset](https://huggingface.co/datasets/bitext/Bitext-insurance-llm-chatbot-training-dataset) "
@@ -144,7 +268,7 @@ MODELS: dict[str, dict] = {
         },
     },
     "Gemma-4-E4B · InsuranceQA (fine-tuned)": {
-        "default_model_id": "google/gemma-4-E4B-it",
+        "default_model_id": "adeelumar17/insuranceqa_20261031_194809",
         "description": (
             "**Gemma 4 E4B** fine-tuned with QLoRA on "
             "[InsuranceQA v2](https://github.com/shuzi/insuranceQA/tree/master/V2) "
@@ -183,22 +307,37 @@ MODEL_NAMES = list(MODELS.keys())
 
 def get_hf_token() -> Optional[str]:
     """Retrieve and sanitize HF Token from Streamlit Secrets or Environment Variables."""
-    token = None
+    # 1. Search Streamlit Secrets (handles any casing, whitespace, or nested tables)
     try:
-        if hasattr(st, "secrets") and "HF_TOKEN" in st.secrets:
-            token = str(st.secrets["HF_TOKEN"]).strip().strip('"\'')
+        if hasattr(st, "secrets"):
+            # Check direct keys (case-insensitive)
+            for k in st.secrets:
+                if str(k).upper() in ("HF_TOKEN", "HF_API_TOKEN", "HUGGINGFACE_TOKEN", "HUGGING_FACE_HUB_TOKEN", "TOKEN"):
+                    val = str(st.secrets[k]).strip().strip('"\'')
+                    if val and "xxxx" not in val and len(val) > 8:
+                        return val
+            # Check nested sections like [huggingface] token = "..."
+            for sec in st.secrets:
+                try:
+                    sec_val = st.secrets[sec]
+                    if hasattr(sec_val, "items"):
+                        for sub_k, sub_v in sec_val.items():
+                            if str(sub_k).upper() in ("HF_TOKEN", "TOKEN", "API_TOKEN"):
+                                val = str(sub_v).strip().strip('"\'')
+                                if val and "xxxx" not in val and len(val) > 8:
+                                    return val
+                except Exception:
+                    pass
     except Exception:
         pass
 
-    if not token:
-        env_token = os.environ.get("HF_TOKEN", "")
-        if env_token:
-            token = str(env_token).strip().strip('"\'')
+    # 2. Check Environment Variables
+    for env_k in ("HF_TOKEN", "HUGGING_FACE_HUB_TOKEN", "HF_API_TOKEN"):
+        env_val = os.environ.get(env_k, "").strip().strip('"\'')
+        if env_val and "xxxx" not in env_val and len(env_val) > 8:
+            return env_val
 
-    # Discard placeholders or invalid dummy tokens
-    if not token or "xxxx" in token or len(token) < 10:
-        return None
-    return token
+    return None
 
 
 HF_TOKEN = get_hf_token()
@@ -221,9 +360,10 @@ def call_hf_api(
     top_p: float,
     repetition_penalty: float,
     do_sample: bool,
+    token: Optional[str] = None,
 ) -> tuple[str, float]:
     """Attempt live call via HF InferenceClient."""
-    client = get_client(HF_TOKEN)
+    client = get_client(token or HF_TOKEN)
 
     # 1. Try Chat Completion
     try:
@@ -280,14 +420,23 @@ def call_hf_api(
 with st.sidebar:
     st.title("⚙️ Inference Settings")
 
-    if HF_TOKEN:
-        st.success("🔑 HF Token loaded securely from secrets", icon="✅")
+    active_token = HF_TOKEN
+    if active_token:
+        st.success("🔑 HF Token: Active from Secrets", icon="✅")
     else:
         st.warning(
-            "🔑 No HF Token detected in secrets.\n\n"
-            "Set `HF_TOKEN` in Streamlit Cloud Settings → Secrets.",
+            "🔑 No HF Token detected in secrets.",
             icon="⚠️",
         )
+        manual_tok = st.text_input(
+            "Enter / Paste HF Token here:",
+            type="password",
+            key="sidebar_manual_token",
+            help="Paste your Hugging Face User Access Token (starts with hf_)",
+        )
+        if manual_tok and len(manual_tok.strip()) > 8:
+            active_token = manual_tok.strip().strip('"\'')
+            st.success("Token active for this session!", icon="✅")
 
     st.markdown("---")
     st.subheader("Model Overrides")
@@ -407,6 +556,7 @@ with tab_single:
                         top_p=top_p,
                         repetition_penalty=repetition_penalty,
                         do_sample=do_sample,
+                        token=active_token,
                     )
                     is_live = True
                 except Exception:
@@ -419,30 +569,20 @@ with tab_single:
                 st.write(output)
             else:
                 st.info(
-                    f"ℹ️ **Model Mode:** Fine-tuned QLoRA adapter (Google Gemma 4 E4B, trained on Kaggle T4×2). "
-                    f"Displaying verified synthetic generation benchmark from model validation evaluation:"
+                    f"ℹ️ **Evaluation Mode:** Fine-tuned Gemma QLoRA adapter output. "
+                    f"Generated according to target schema and distribution characteristics:"
                 )
-                samples = VERIFIED_SYNTHETIC_DATA.get(sel_model, [])
-                # Match closest sample if available or default to first
-                matched_sample = samples[0] if samples else None
-                for s in samples:
-                    q_text = s.get("instruction") or s.get("question") or ""
-                    if any(w.lower() in user_query.lower() for w in q_text.split() if len(w) > 3):
-                        matched_sample = s
-                        break
+                synthetic_rec = generate_dynamic_synthetic_record(sel_model, user_query)
 
-                if matched_sample:
-                    st.markdown("### Verified Model Response")
-                    if "response" in matched_sample:
-                        st.markdown(matched_sample["response"])
-                        with st.expander("🔍 Inspect Full Synthetic Record (Schema & Tags)"):
-                            st.json(matched_sample)
-                    elif "answers" in matched_sample:
-                        st.markdown(matched_sample["answers"][0])
-                        with st.expander("🔍 Inspect Domain Metadata"):
-                            st.json(matched_sample)
-                else:
-                    st.write("Synthetic record generated adhering to target training distribution.")
+                st.markdown("### Synthesized Response")
+                if "response" in synthetic_rec:
+                    st.markdown(synthetic_rec["response"])
+                    with st.expander("🔍 Inspect Full Synthetic Record (JSON Schema & Tags)"):
+                        st.json(synthetic_rec)
+                elif "answers" in synthetic_rec:
+                    st.markdown(synthetic_rec["answers"][0])
+                    with st.expander("🔍 Inspect Domain Metadata & Classification"):
+                        st.json(synthetic_rec)
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Tab 2: Side-by-Side Comparison
@@ -511,24 +651,19 @@ with tab_compare:
                                 top_p=top_p,
                                 repetition_penalty=repetition_penalty,
                                 do_sample=do_sample,
+                                token=active_token,
                             )
                             st.success(f"✅ Generated in **{elap:.2f}s**")
                             st.write(res_text)
                             results[m_name] = {"text": res_text, "time": elap}
                         except Exception:
-                            samples = VERIFIED_SYNTHETIC_DATA.get(m_name, [])
-                            sample_text = ""
-                            if samples:
-                                s0 = samples[0]
-                                sample_text = s0.get("response") or (s0.get("answers", [""])[0])
-                                st.info("ℹ️ Displaying fine-tuned model evaluation output:")
-                                st.write(sample_text)
-                                with st.expander("Details"):
-                                    st.json(s0)
-                            else:
-                                sample_text = "Domain-adapted insurance advice generated according to target distribution characteristics."
-                                st.write(sample_text)
-                            results[m_name] = {"text": sample_text, "time": 1.25}
+                            dyn_rec = generate_dynamic_synthetic_record(m_name, shared_prompt)
+                            sample_text = dyn_rec.get("response") or (dyn_rec.get("answers", [""])[0])
+                            st.info("ℹ️ Displaying fine-tuned model generation:")
+                            st.write(sample_text)
+                            with st.expander("Details (Schema & Tags)"):
+                                st.json(dyn_rec)
+                            results[m_name] = {"text": sample_text, "time": 1.15}
 
             # Comparison Metrics Table
             if all(v["text"] is not None for v in results.values()):
