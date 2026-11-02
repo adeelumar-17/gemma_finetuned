@@ -161,7 +161,7 @@ def load_model_cached(model_name: str, load_in_4bit: bool, hf_token: Optional[st
 
     model_kwargs: dict = dict(
         device_map="auto",
-        torch_dtype=torch.float16,
+        dtype=torch.float16,
         **token_kwarg,
     )
     if bnb_config:
@@ -268,11 +268,31 @@ def run_inference(
 with st.sidebar:
     st.title("⚙️ Settings")
 
-    hf_token = st.text_input(
-        "🔑 HuggingFace Token (optional)",
-        type="password",
-        help="Required only if the adapter repos are private. Leave blank for public access.",
+    # Auto-load token from .streamlit/secrets.toml or environment variable.
+    # Falls back to manual entry so the app still works without a secrets file.
+    _default_token = (
+        st.secrets.get("HF_TOKEN", "")
+        if hasattr(st, "secrets")
+        else os.environ.get("HF_TOKEN", "")
     )
+
+    hf_token = st.text_input(
+        "🔑 HuggingFace Token",
+        value=_default_token,
+        type="password",
+        help=(
+            "Required for Gemma (gated model) and any private adapter repos. "
+            "Get yours at huggingface.co/settings/tokens. "
+            "You can also store it in .streamlit/secrets.toml as HF_TOKEN = '...' "
+            "so it loads automatically."
+        ),
+    )
+    if not hf_token:
+        st.warning(
+            "⚠️ No HF token found. Gemma models will fail to load. "
+            "Add your token above or in `.streamlit/secrets.toml`.",
+            icon="🔑",
+        )
 
     st.markdown("---")
     st.subheader("Inference Configuration")
@@ -362,10 +382,12 @@ with tab_single:
         for ep in example_prompts:
             if st.button(ep, key=f"single_ex_{ep[:30]}"):
                 st.session_state["single_user_input"] = ep
+                st.rerun()
 
+    # When key= is used, Streamlit manages the value via session state automatically.
+    # Do NOT also pass value=st.session_state.get(key) — that causes a conflict error.
     user_input_single = st.text_area(
         "Your message / question",
-        value=st.session_state.get("single_user_input", ""),
         height=120,
         placeholder="Ask anything about insurance…",
         key="single_user_input",
@@ -458,10 +480,11 @@ with tab_compare:
         for ep in example_prompts_cmp:
             if st.button(ep, key=f"cmp_ex_{ep[:30]}"):
                 st.session_state["cmp_user_input"] = ep
+                st.rerun()
 
+    # Same rule: key= is set, so do NOT also pass value=st.session_state.get(key)
     user_input_cmp = st.text_area(
         "Shared prompt (sent to both models)",
-        value=st.session_state.get("cmp_user_input", ""),
         height=120,
         placeholder="Ask anything about insurance…",
         key="cmp_user_input",
